@@ -1,0 +1,22 @@
+# Personal / machine-specific state — NEVER commit.
+# All real data lives in $DSH_DATA_DIR (default ~/.local/share/disk-space-helper),
+# outside the repo. These entries are defense-in-depth in case that's overridden here.
+snapshots/
+reports/
+knowledge/profile.md
+knowledge/rules.yaml
+decisions.jsonl
+*.sqlite
+*.sqlite-*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# macOS
+.DS_Store
