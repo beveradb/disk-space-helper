@@ -16,12 +16,12 @@ NEVER_TOUCH = ("/System", "/bin", "/sbin", "/usr", "/Volumes",
 def is_safe(path: str) -> bool:
     if not path.startswith("/"):
         return False
-    # Normalize away ".." / "." / duplicate slashes before prefix-matching,
-    # so a traversal like "/Users/x/Downloads/../../../System/y" can't
-    # dodge the NEVER_TOUCH check by textually starting under a safe dir.
-    normalized = os.path.normpath(path)
-    return not any(normalized == p or normalized.startswith(p + "/")
-                   for p in NEVER_TOUCH)
+    norm = os.path.normpath(path).lower()
+    for p in NEVER_TOUCH:
+        pl = p.lower()
+        if norm == pl or norm.startswith(pl + "/"):
+            return False
+    return True
 
 
 def _log(log_path, record) -> None:
@@ -39,9 +39,10 @@ def run_plan(plan, *, apply: bool, trash_fn=trash.to_trash,
         path = item["path"]
         if not is_safe(path):
             refused.append(path)
-            _log(log_path, {"run_id": run_id, "path": path,
-                            "action": "refused", "reason": item.get("reason", ""),
-                            "rule_id": item.get("rule_id")})
+            if apply:
+                _log(log_path, {"run_id": run_id, "path": path,
+                                "action": "refused", "reason": item.get("reason", ""),
+                                "rule_id": item.get("rule_id")})
             continue
         planned.append(path)
         if not apply:
