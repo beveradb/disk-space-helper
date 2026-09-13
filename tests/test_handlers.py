@@ -7,6 +7,11 @@ def test_run_cmd_no_raise():
     assert rc == 3
 
 
+def test_run_cmd_missing_binary_degrades():
+    rc, out, err = base.run_cmd(["dsh-definitely-not-a-real-binary-xyz"])
+    assert rc == 127 and out == "" and err == ""
+
+
 def test_homebrew_report_parses(tmp_path):
     sample = "Would remove: /Users/a/Library/Caches/Homebrew/foo (1.2GB)\n" \
              "==> This operation would free approximately 3.5GB of disk space.\n"

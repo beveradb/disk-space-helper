@@ -61,3 +61,14 @@ def test_dry_run_writes_no_log(tmp_path):
     fn = mock.Mock()
     reclaim.run_plan(plan, apply=False, trash_fn=fn, log_path=log)
     assert not log.exists()  # dry-run must be side-effect-free
+
+
+def test_run_plan_sums_trashed_bytes():
+    from unittest import mock
+    import os
+    plan = [{"path": os.path.expanduser("~/dsh-a"), "reason": "t", "physical": 100},
+            {"path": os.path.expanduser("~/dsh-b"), "reason": "t", "physical": 50},
+            {"path": "/System/nope", "reason": "bad", "physical": 999}]
+    fn = mock.Mock(return_value=mock.Mock(ok=True, method="finder", error=None))
+    res = reclaim.run_plan(plan, apply=True, trash_fn=fn)
+    assert res["trashed_bytes"] == 150  # refused /System item not counted

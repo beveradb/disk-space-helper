@@ -33,11 +33,17 @@ each script's own directory to `sys.path`.
    `PYTHONPATH=bin:. python3 -c "from handlers import homebrew; print(homebrew.report())"`,
    likewise for `xcode`, `dropbox`, `icloud`). Show reclaimable bytes.
    Build a plan JSON for approved auto-trash items — a list of objects like
-   `[{"path": "/abs/path", "reason": "why", "rule_id": "rule-id-or-null"}]` —
+   `[{"path": "/abs/path", "reason": "why", "rule_id": "rule-id-or-null", "physical": bytes-optional}]`
+   (the optional `physical` field is the on-disk footprint of that item; when
+   present it's summed into `trashed_bytes` for successfully-trashed items) —
    and run `python3 bin/reclaim.py plan.json` (dry-run: reports `planned` /
    `refused`, trashes nothing) → show the result → re-run with `--apply` on
    approval (trashes `planned` items not covered by `NEVER_TOUCH`, reports
-   `trashed` and `freed_bytes`).
+   `trashed`, `trashed_bytes`, and `df_free_before`/`df_free_after`).
+   `trashed_bytes` is the footprint moved to Trash, not a change in disk free
+   space — items on the same volume move to `~/.Trash` and don't free space
+   until Andrew empties the Trash, so `df_free_before`/`df_free_after` will
+   typically look unchanged right after a run.
 5. **Interview.** For the biggest `ask` items, ask ONE question at a time,
    multiple-choice + an "other / notes" option, about Andrew's actual data.
    After each answer:
@@ -53,8 +59,10 @@ each script's own directory to `sys.path`.
    handler is report-only/experimental and never auto-mutates Dropbox.
 7. **Execute** approved actions via `python3 bin/reclaim.py plan.json --apply`.
    Everything is logged to `$DSH_DATA_DIR/decisions.jsonl`.
-8. **Report.** Write `$DSH_DATA_DIR/reports/YYYY-MM-DD-run.md`: reclaimed
-   bytes (before/after `df`), decisions, new rules/facts, and follow-ups.
+8. **Report.** Write `$DSH_DATA_DIR/reports/YYYY-MM-DD-run.md`: `trashed_bytes`
+   (footprint moved to Trash) plus `df_free_before`/`df_free_after` for
+   transparency — note that actual disk free space is only reclaimed once
+   Andrew empties the Trash — decisions, new rules/facts, and follow-ups.
 
 ## Rules of engagement
 - One question at a time during the interview.

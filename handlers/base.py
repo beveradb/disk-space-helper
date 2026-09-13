@@ -8,7 +8,10 @@ from dsh_lib import sizes
 
 
 def run_cmd(cmd, runner=subprocess.run):
-    res = runner(cmd, capture_output=True, text=True)
+    try:
+        res = runner(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        return (127, "", "")
     return (getattr(res, "returncode", 1),
             getattr(res, "stdout", "") or "",
             getattr(res, "stderr", "") or "")

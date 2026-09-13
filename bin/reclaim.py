@@ -35,6 +35,7 @@ def _log(log_path, record) -> None:
 def run_plan(plan, *, apply: bool, trash_fn=trash.to_trash,
              log_path=None, run_id="") -> dict:
     planned, trashed, refused = [], [], []
+    trashed_bytes = 0
     for item in plan:
         path = item["path"]
         if not is_safe(path):
@@ -50,12 +51,14 @@ def run_plan(plan, *, apply: bool, trash_fn=trash.to_trash,
         res = trash_fn(path)
         if res.ok:
             trashed.append(path)
+            trashed_bytes += int(item.get("physical", 0))
         _log(log_path, {"run_id": run_id, "path": path,
                         "action": "trashed" if res.ok else "failed",
                         "method": res.method, "error": res.error,
                         "reason": item.get("reason", ""),
                         "rule_id": item.get("rule_id")})
-    return {"planned": planned, "trashed": trashed, "refused": refused}
+    return {"planned": planned, "trashed": trashed, "refused": refused,
+            "trashed_bytes": trashed_bytes}
 
 
 def main(argv=None) -> int:
@@ -67,7 +70,8 @@ def main(argv=None) -> int:
     before = dfree.free_bytes()
     res = run_plan(plan, apply=args.apply, log_path=str(paths.decisions_log()))
     after = dfree.free_bytes() if args.apply else before
-    res["freed_bytes"] = after - before
+    res["df_free_before"] = before
+    res["df_free_after"] = after
     print(json.dumps(res, indent=2))
     return 0
 
