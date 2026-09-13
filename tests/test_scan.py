@@ -44,3 +44,27 @@ def test_main_writes_summary_json(tmp_path, monkeypatch, capsys):
     assert out.exists()
     summ = json.loads((out.parent / "summary.json").read_text())
     assert "totals" in summ and summ["df_free"] == 42
+
+
+def test_ordinary_dir_rollup_and_exact_category_totals(tmp_path, monkeypatch):
+    # sizes.classify() only tags paths under the real $HOME/Downloads; point
+    # $HOME at tmp_path so the synthetic tree below is classified as intended.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    d = tmp_path / "Downloads" / "manysmall"
+    d.mkdir(parents=True)
+    for i in range(6):
+        (d / f"f{i}.bin").write_bytes(b"x" * (2 * 1024 * 1024))  # 6x2MiB sub-threshold
+    conn = db.connect(tmp_path / "s.sqlite")
+    summary = scan.scan_tree([str(tmp_path)], conn,
+                             min_file_bytes=10 * 1024 * 1024,  # each 2MiB file below
+                             dir_min_bytes=10 * 1024 * 1024,   # 12MiB dir above
+                             excludes=set())
+    conn.commit()
+    rows = {r["path"]: r for r in conn.execute("SELECT * FROM entries").fetchall()}
+    dpath = str(d)
+    assert dpath in rows and rows[dpath]["kind"] == "dir"
+    assert rows[dpath]["physical"] >= 12 * 1024 * 1024
+    assert str(d / "f0.bin") not in rows  # small files not individually recorded
+    totals = db.totals_by_category(conn)
+    assert totals.get("downloads", 0) >= 12 * 1024 * 1024  # exact, includes small files
+    assert summary["total_physical"] >= 12 * 1024 * 1024

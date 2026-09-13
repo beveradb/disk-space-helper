@@ -1,6 +1,7 @@
 """SQLite snapshot storage."""
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -69,6 +70,10 @@ def top_by_physical(conn, limit: int = 50, category: str | None = None):
 
 
 def totals_by_category(conn) -> dict:
+    row = conn.execute(
+        "SELECT value FROM meta WHERE key='category_totals'").fetchone()
+    if row and row["value"]:
+        return {k: int(v) for k, v in json.loads(row["value"]).items()}
     rows = conn.execute(
         "SELECT category, SUM(physical) AS total FROM entries GROUP BY category"
     ).fetchall()
