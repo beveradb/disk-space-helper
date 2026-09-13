@@ -1,0 +1,10 @@
+# Learned classification rules. Each rule is applied to scanned paths.
+# action: keep | auto-trash | ask
+rules:
+  - id: xcode-derived-data
+    pattern: "~/Library/Developer/Xcode/DerivedData/*"
+    action: ask
+    confidence: medium
+    rationale: "Regenerated on next build; usually safe to remove."
+    learned_on: 2026-09-13
+    times_applied: 0
