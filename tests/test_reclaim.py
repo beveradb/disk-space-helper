@@ -11,6 +11,13 @@ def test_is_safe():
     assert reclaim.is_safe(os.path.expanduser("~/Downloads/x")) is True
 
 
+def test_is_safe_rejects_path_traversal_into_never_touch():
+    # Absolute path that textually starts under a safe dir but normalizes
+    # (via ".." components) into a NEVER_TOUCH prefix must be refused.
+    sneaky = "/Users/whoever/Downloads/../../../System/CoreServices"
+    assert reclaim.is_safe(sneaky) is False
+
+
 def test_dry_run_does_not_trash(tmp_path):
     import os
     # Use a path under $HOME (not tmp_path): on macOS, pytest's tmp_path

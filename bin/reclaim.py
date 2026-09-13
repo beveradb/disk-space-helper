@@ -16,7 +16,12 @@ NEVER_TOUCH = ("/System", "/bin", "/sbin", "/usr", "/Volumes",
 def is_safe(path: str) -> bool:
     if not path.startswith("/"):
         return False
-    return not any(path == p or path.startswith(p + "/") for p in NEVER_TOUCH)
+    # Normalize away ".." / "." / duplicate slashes before prefix-matching,
+    # so a traversal like "/Users/x/Downloads/../../../System/y" can't
+    # dodge the NEVER_TOUCH check by textually starting under a safe dir.
+    normalized = os.path.normpath(path)
+    return not any(normalized == p or normalized.startswith(p + "/")
+                   for p in NEVER_TOUCH)
 
 
 def _log(log_path, record) -> None:
