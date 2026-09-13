@@ -19,7 +19,7 @@ def _home_trash() -> Path:
 
 
 def _finder_delete(path: str, runner) -> None:
-    posix = path.replace('"', '\\"')
+    posix = path.replace('\\', '\\\\').replace('"', '\\"')
     script = f'tell application "Finder" to delete POSIX file "{posix}"'
     res = runner(["osascript", "-e", script], capture_output=True, text=True)
     if getattr(res, "returncode", 1) != 0:

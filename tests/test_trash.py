@@ -25,3 +25,19 @@ def test_to_trash_falls_back_to_move(tmp_path, monkeypatch):
     assert res.ok and res.method == "move"
     assert (fake_trash / "junk.bin").exists()
     assert not f.exists()
+
+
+def test_finder_script_escapes_quotes_and_backslashes():
+    captured = {}
+
+    def runner(cmd, capture_output=False, text=False):
+        captured["cmd"] = cmd
+        return mock.Mock(returncode=0, stderr="")
+
+    weird = '/tmp/O\'Brien\'s "weird"\\backup.zip'
+    res = trash.to_trash(weird, runner=runner)
+    assert res.ok and res.method == "finder"
+    script = captured["cmd"][2]  # ["osascript", "-e", <script>]
+    # backslash escaped to \\ and double-quote escaped to \" inside the literal
+    assert '\\\\backup.zip' in script
+    assert '\\"weird\\"' in script
