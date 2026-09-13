@@ -1,0 +1,14 @@
+[project]
+name = "disk-space-helper"
+version = "0.1.0"
+description = "Personal disk-space reasoning system for macOS, driven by Claude Code"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["bin"]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["dsh_lib"]
+package-dir = {"" = "bin"}
