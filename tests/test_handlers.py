@@ -41,3 +41,25 @@ def test_dropbox_report_is_nondestructive(tmp_path, monkeypatch):
     assert rep["experimental"] is True
     assert rep["reclaimable_bytes"] >= 2 * 1024 * 1024
     assert "manual" in rep["detail"].lower()
+
+
+def test_icloud_available_checks_root_and_brctl(monkeypatch, tmp_path):
+    root = tmp_path / "Mobile Documents"
+    root.mkdir()
+    monkeypatch.setattr(icloud, "_icloud_root", lambda: root)
+    runner = mock.Mock(return_value=mock.Mock(returncode=0, stdout="", stderr=""))
+    assert icloud.available(runner=runner) is True
+    # missing root => unavailable, without calling brctl
+    monkeypatch.setattr(icloud, "_icloud_root", lambda: tmp_path / "nope")
+    assert icloud.available(runner=runner) is False
+
+
+def test_icloud_report_sums_local(tmp_path, monkeypatch):
+    root = tmp_path / "Mobile Documents"
+    (root / "iCloud~app").mkdir(parents=True)
+    (root / "iCloud~app" / "local.bin").write_bytes(b"z" * (3 * 1024 * 1024))
+    monkeypatch.setattr(icloud, "_icloud_root", lambda: root)
+    rep = icloud.report()
+    assert rep["handler"] == "icloud"
+    assert rep["reclaimable_bytes"] >= 3 * 1024 * 1024
+    assert "brctl evict" in rep["detail"]
