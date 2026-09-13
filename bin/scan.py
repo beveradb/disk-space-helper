@@ -18,6 +18,10 @@ from dsh_lib import db, dfree, paths, sizes
 DEFAULT_EXCLUDES = {
     "/System", "/Volumes", "/private/var", "/private/tmp", "/dev", "/net",
     "/.vol", "/cores",
+    # Cloud/device file-provider mounts (OneDrive, Google Drive, MacDroid phone
+    # mounts, etc.) live here; they are network-backed, prone to multi-minute
+    # hangs/timeouts, and are not local disk we reclaim. Scan explicitly if needed.
+    os.path.expanduser("~/Library/CloudStorage"),
 }
 NO_DESCEND = ("node_modules", ".git", "DerivedData", ".venv", "venv",
               "__pycache__", "target", ".gradle", ".cargo")
@@ -73,45 +77,52 @@ class _Scanner:
             it = os.scandir(path)
         except OSError:
             return 0, 0, 0.0
-        with it:
-            for de in it:
-                p = de.path
-                if is_excluded(p, self.excludes):
-                    continue
-                try:
-                    st = de.stat(follow_symlinks=False)
-                except OSError:
-                    continue
-                if de.is_symlink():
-                    continue
-                flags = getattr(st, "st_flags", 0)
-                if de.is_dir(follow_symlinks=False):
-                    if de.name in NO_DESCEND:
-                        phys, logi, lm = _dir_footprint(p)
-                        self.category_totals[sizes.classify(p)] += phys
-                        self.total_physical += phys
-                        self.total_logical += logi
-                        self._record(p, "dir", phys, logi, lm, st.st_atime, flags)
-                    else:
-                        phys, logi, lm = self.scan_dir(p)
-                        if phys >= self.dir_min_bytes:
-                            self._record(p, "dir", phys, logi, lm,
-                                         st.st_atime, flags)
-                    tot_p += phys
-                    tot_l += logi
-                    latest = max(latest, lm)
-                else:
-                    phys = sizes.physical_bytes(st)
-                    logi = sizes.logical_bytes(st)
-                    self.category_totals[sizes.classify(p)] += phys
-                    self.total_physical += phys
-                    self.total_logical += logi
-                    tot_p += phys
-                    tot_l += logi
-                    latest = max(latest, st.st_mtime)
-                    if phys >= self.min_file_bytes:
-                        self._record(p, "file", phys, logi, st.st_mtime,
-                                     st.st_atime, flags)
+        # The `for de in it` readdir can hang/timeout on network or cloud
+        # file-provider mounts; the outer try skips such a directory instead of
+        # aborting the whole scan. The inner try skips a single unreadable entry.
+        try:
+            with it:
+                for de in it:
+                    try:
+                        p = de.path
+                        if is_excluded(p, self.excludes):
+                            continue
+                        st = de.stat(follow_symlinks=False)
+                        if de.is_symlink():
+                            continue
+                        flags = getattr(st, "st_flags", 0)
+                        if de.is_dir(follow_symlinks=False):
+                            if de.name in NO_DESCEND:
+                                phys, logi, lm = _dir_footprint(p)
+                                self.category_totals[sizes.classify(p)] += phys
+                                self.total_physical += phys
+                                self.total_logical += logi
+                                self._record(p, "dir", phys, logi, lm,
+                                             st.st_atime, flags)
+                            else:
+                                phys, logi, lm = self.scan_dir(p)
+                                if phys >= self.dir_min_bytes:
+                                    self._record(p, "dir", phys, logi, lm,
+                                                 st.st_atime, flags)
+                            tot_p += phys
+                            tot_l += logi
+                            latest = max(latest, lm)
+                        else:
+                            phys = sizes.physical_bytes(st)
+                            logi = sizes.logical_bytes(st)
+                            self.category_totals[sizes.classify(p)] += phys
+                            self.total_physical += phys
+                            self.total_logical += logi
+                            tot_p += phys
+                            tot_l += logi
+                            latest = max(latest, st.st_mtime)
+                            if phys >= self.min_file_bytes:
+                                self._record(p, "file", phys, logi, st.st_mtime,
+                                             st.st_atime, flags)
+                    except OSError:
+                        continue
+        except OSError:
+            pass
         return tot_p, tot_l, latest
 
 

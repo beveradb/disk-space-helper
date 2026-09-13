@@ -68,3 +68,46 @@ def test_ordinary_dir_rollup_and_exact_category_totals(tmp_path, monkeypatch):
     totals = db.totals_by_category(conn)
     assert totals.get("downloads", 0) >= 12 * 1024 * 1024  # exact, includes small files
     assert summary["total_physical"] >= 12 * 1024 * 1024
+
+
+def test_cloudstorage_excluded_by_default():
+    p = os.path.expanduser("~/Library/CloudStorage/OneDrive/x")
+    assert scan.is_excluded(p, scan.DEFAULT_EXCLUDES) is True
+
+
+def test_scan_survives_dir_whose_iteration_raises(tmp_path, monkeypatch):
+    # A large file at the top level proves the scan continues past a bad dir.
+    (tmp_path / "good.bin").write_bytes(b"x" * (11 * 1024 * 1024))
+    bad = tmp_path / "bad"
+    bad.mkdir()
+
+    real_scandir = os.scandir
+
+    def flaky_scandir(p=".", *a, **k):
+        # scandir() itself succeeds, but iterating the result times out —
+        # exactly the real network/cloud-mount failure mode.
+        if os.fspath(p) == str(bad):
+            class _It:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *exc):
+                    return False
+
+                def __iter__(self):
+                    return self
+
+                def __next__(self):
+                    raise TimeoutError(60, "Operation timed out")
+
+            return _It()
+        return real_scandir(p, *a, **k)
+
+    monkeypatch.setattr(scan.os, "scandir", flaky_scandir)
+    conn = db.connect(tmp_path / "s.sqlite")
+    summary = scan.scan_tree([str(tmp_path)], conn,
+                             min_file_bytes=10 * 1024 * 1024, excludes=set())
+    conn.commit()
+    rows = {r["path"] for r in conn.execute("SELECT path FROM entries").fetchall()}
+    assert str(tmp_path / "good.bin") in rows  # completed despite the bad dir
+    assert summary["total_physical"] >= 11 * 1024 * 1024
